@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Apply for Hostel</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+
+<body>
+<div class="container">
+<h2>Hostel Application Form</h2>
+
+<form method="POST">
+    <label>Hostel Name:</label><br>
+    <select name="hostel_name" required>
+        <option value="">--Select Hostel--</option>
+        <option>BOYS HOSTEL</option>
+        <option>GIRLS HOSTEL</option>
+    </select><br><br>
+
+    <label>Room Type:</label><br>
+    <select name="room_type" required>
+        <option value="">--Select Room Type--</option>
+        <option>Single</option>
+        <option>Triple</option>
+    </select><br><br>
+
+    <label>Distance from Home to College (in km):</label><br>
+    <input type="number" name="distance" placeholder="Enter distance in km" required><br><br>
+
+    <label>Reason for Hostel:</label><br>
+    <textarea name="reason" rows="4" cols="50" required></textarea><br><br>
+
+    <button type="submit">Apply</button>
+</form>
+
+<p>
+    <a href="/student/dashboard">Back to Dashboard</a>
+</p>
+</div>
+</body>
+</html>

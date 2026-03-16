@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Warden Dashboard</title>
+    <style>
+        button { margin:5px; padding:10px 20px; cursor:pointer; }
+        table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+        th, td { border:1px solid #000; padding:5px; text-align:center; }
+    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script>
+        function showTable(tableId){
+            // hide all tables first
+            document.getElementById('all_students').style.display = 'none';
+            document.getElementById('applied_students').style.display = 'none';
+            document.getElementById('approved_students').style.display = 'none';
+            document.getElementById('pending_students').style.display = 'none';
+            // show selected table
+            document.getElementById(tableId).style.display = 'block';
+        }
+    </script>
+</head>
+<body>
+<div class="container">
+<h2>Welcome, {{ session['warden_name'] }}</h2>
+
+<h3>Statistics / Quick Access:</h3>
+<button onclick="showTable('all_students')">Total Registered Students ({{ total_students }})</button>
+<button onclick="showTable('applied_students')">Hostel Applied Students ({{ total_applied }})</button>
+<button onclick="showTable('approved_students')">Approved Hostel Applications ({{ approved_count }})</button>
+<button onclick="showTable('pending_students')">Pending Hostel Applications ({{ pending_count }})</button>
+
+<!-- 1️⃣ All Registered Students -->
+<div id="all_students" style="display:none; margin-top:20px;">
+<h3>All Registered Students</h3>
+<table>
+<tr>
+    <th>Photo</th>
+    <th>Name</th>
+    <th>Roll No</th>
+    <th>Branch</th>
+    <th>Semester</th>
+    <th>Email</th>
+    <th>Contact</th>
+</tr>
+{% for s in students_all %}
+<tr>
+    <td>{% if s.photo %}<img src="{{ url_for('static', filename='uploads/photo/' + s.photo) }}" width="80" height="80">{% else %}N/A{% endif %}</td>
+    <td>{{ s.name }}</td>
+    <td>{{ s.rollno }}</td>
+    <td>{{ s.branch }}</td>
+    <td>{{ s.semester }}</td>
+    <td>{{ s.email }}</td>
+    <td>{{ s.contact }}</td>
+</tr>
+{% endfor %}
+</table>
+</div>
+
+<!-- 2️⃣ Hostel Applied Students -->
+<div id="applied_students" style="display:none; margin-top:20px;">
+<h3>Students Applied for Hostel</h3>
+<table>
+<tr>
+    <th>Photo</th>
+    <th>Name</th>
+    <th>Roll No</th>
+    <th>Branch</th>
+    <th>Hostel Name</th>
+    <th>Room Type</th>
+    <th>Status</th>
+</tr>
+{% for app in applications %}
+<tr>
+    <td>{% if app.photo %}<img src="{{ url_for('static', filename='uploads/photo/' + app.photo) }}" width="80" height="80">{% else %}N/A{% endif %}</td>
+    <td>{{ app.name }}</td>
+    <td>{{ app.rollno }}</td>
+    <td>{{ app.branch }}</td>
+    <td>{{ app.hostel_name }}</td>
+    <td>{{ app.room_type }}</td>
+    <td>{{ app.status }}</td>
+</tr>
+{% endfor %}
+</table>
+</div>
+
+<!-- 3️⃣ Approved Hostel Applications -->
+<div id="approved_students" style="display:none; margin-top:20px;">
+<h3>Approved Hostel Applications</h3>
+<table>
+<tr>
+    <th>Photo</th>
+    <th>Name</th>
+    <th>Roll No</th>
+    <th>Hostel Name</th>
+    <th>Room Type</th>
+</tr>
+{% for app in applications if app.status=='Approved' %}
+<tr>
+    <td>{% if app.photo %}<img src="{{ url_for('static', filename='uploads/photo/' + app.photo) }}" width="80" height="80">{% else %}N/A{% endif %}</td>
+    <td>{{ app.name }}</td>
+    <td>{{ app.rollno }}</td>
+    <td>{{ app.hostel_name }}</td>
+    <td>{{ app.room_type }}</td>
+</tr>
+{% endfor %}
+</table>
+</div>
+
+<!-- 4️⃣ Pending Hostel Applications -->
+<div id="pending_students" style="display:none; margin-top:20px;">
+<h3>Pending Hostel Applications</h3>
+<table>
+<tr>
+    <th>Photo</th>
+    <th>Name</th>
+    <th>Roll No</th>
+    <th>Hostel Name</th>
+    <th>Room Type</th>
+    <th>Action</th>
+</tr>
+{% for app in applications if app.status=='Pending' %}
+<tr>
+    <td>{% if app.photo %}<img src="{{ url_for('static', filename='uploads/photo/' + app.photo) }}" width="80" height="80">{% else %}N/A{% endif %}</td>
+    <td>{{ app.name }}</td>
+    <td>{{ app.rollno }}</td>
+    <td>{{ app.hostel_name }}</td>
+    <td>{{ app.room_type }}</td>
+    <td>
+        <a href="/warden/approve/{{ app.id }}">Approve</a> |
+        <a href="/warden/reject/{{ app.id }}">Reject</a>
+    </td>
+</tr>
+{% endfor %}
+</table>
+</div>
+
+<p><a href="/logout">Logout</a></p>
+</div>
+</body>
+</html>

@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Student Registration</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+
+<body>
+<div class="container">
+<h2>Student Registration</h2>
+
+<form method="POST" enctype="multipart/form-data">
+
+    <input type="text" name="name" placeholder="Full Name" required><br><br>
+
+    <select name="branch" required>
+        <option value="">-- Select Branch --</option>
+        <option>CSE (AI & ML)</option>
+        <option>CSE (IOT)</option>
+        <option>EE</option>
+        <option>ME</option>
+        <option>CE</option>
+    </select><br><br>
+
+    <select name="semester" required>
+        <option value="">-- Select Semester --</option>
+        <option>1st</option>
+        <option>2nd</option>
+        <option>3rd</option>
+        <option>4th</option>
+        <option>5th</option>
+        <option>6th</option>
+        <option>7th</option>
+        <option>8th</option>
+    </select><br><br>
+
+    <input type="number" name="rollno" placeholder="College Roll Number" required><br><br>
+
+    <select name="gender" required>
+        <option value="">-- Select Gender --</option>
+        <option>Male</option>
+        <option>Female</option>
+        <option>Other</option>
+    </select><br><br>
+
+    <input type="date" name="dob" required><br><br>
+
+    <input type="email" name="email" placeholder="Email Address" required><br><br>
+
+    <input type="password" name="password" placeholder="Create Password" required><br><br>
+
+    <input type="text" name="contact" placeholder="Mobile Number" required><br><br>
+
+    <input type="text" name="father" placeholder="Father's Name" required><br><br>
+
+    <input type="text" name="mother" placeholder="Mother's Name" required><br><br>
+
+    <input type="text" name="parent_contact" placeholder="Parent Contact Number" required><br><br>
+
+    <input type="text" name="address" placeholder="Full Address" required><br><br>
+
+    <input type="text" name="rank" placeholder="State Rank" required><br><br>
+
+    <select name="category" required>
+        <option value="">-- Select Category --</option>
+        <option>GENRAL</option>
+        <option>OBC</option>
+        <option>EBC</option>
+        <option>SC</option>
+        <option>ST</option>
+    </select><br><br>
+
+    <input type="text" name="category_rank" placeholder="category rank"><br><br>
+
+    <input type="text" name="income" placeholder="Family Annual Income" required><br><br>
+
+    <input type="text" name="aadhaar_number"
+           placeholder="Aadhaar Number"
+           maxlength="12"
+           pattern="[0-9]{12}"
+           required><br><br>
+
+    <label>Student Photo</label><br>
+    <input type="file" name="photo" required><br><br>
+
+    <label>Signature</label><br>
+    <input type="file" name="signature" required><br><br>
+
+    <label>Aadhaar Card</label><br>
+    <input type="file" name="aadhaar_file" required><br><br>
+
+    <label>Hostel Fee Receipt</label><br>
+    <input type="file" name="hostel_fee_receipt" required><br><br>
+
+    <label>Admission Fee Slip</label><br>
+    <input type="file" name="admission_fee_slip" required><br><br>
+
+    <label>Income certificate</label><br>
+    <input type="file" name="income_Certificate" required><br><br>
+
+    <button type="submit">Register</button>
+</form>
+
+<p>Already registered? <a href="/student/login">Login</a></p>
+</div>
+</body>
+</html>

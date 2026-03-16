@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Student Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+
+<body>
+<div class="container">
+<h2 id="greeting"></h2>
+<h3>Welcome, {{ student.name }}!</h3>
+
+<!-- Student Photo -->
+{% if student.photo %}
+<img src="{{ url_for('static', filename='uploads/photo/' + student.photo) }}" 
+     alt="Student Photo" width="150" height="150">
+{% endif %}
+
+<h4>Your Details:</h4>
+<ul>
+    <li><strong>Branch:</strong> {{ student.branch }}</li>
+    <li><strong>Semester:</strong> {{ student.semester }}</li>
+    <li><strong>Roll Number:</strong> {{ student.rollno }}</li>
+    <li><strong>Gender:</strong> {{ student.gender }}</li>
+    <li><strong>Date of Birth:</strong> {{ student.dob }}</li>
+    <li><strong>Email:</strong> {{ student.email }}</li>
+    <li><strong>Contact:</strong> {{ student.contact }}</li>
+    <li><strong>Father's Name:</strong> {{ student.father }}</li>
+    <li><strong>Mother's Name:</strong> {{ student.mother }}</li>
+    <li><strong>Parent Contact:</strong> {{ student.parent_contact }}</li>
+    <li><strong>Address:</strong> {{ student.address }}</li>
+    <li><strong>State Rank:</strong> {{ student.rank }}</li>
+    <li><strong>Category:</strong> {{ student.category }}</li>
+    <li><strong>Category Rank:</strong> {{ student.category_rank }}</li>
+    <li><strong>Annual Family Income:</strong> {{ student.income }}</li>
+    <li><strong>Aadhaar Number:</strong> {{ student.aadhaar_number }}</li>
+</ul>
+
+<h4>Hostel Applications:</h4>
+{% if applications %}
+<table border="1" cellpadding="5" cellspacing="0">
+    <tr>
+        <th>Hostel Name</th>
+        <th>Room Type</th>
+        <th>Reason</th>
+        <th>Distance (km)</th>
+        <th>Status</th>
+        <th>Applied On</th>
+        <th>Block/Floor/Room/Bed</th>
+    </tr>
+    {% for app in applications %}
+    <tr>
+        <td>{{ app.hostel_name }}</td>
+        <td>{{ app.room_type }}</td>
+        <td>{{ app.reason }}</td>
+        <td>{{ app.distance }}</td>
+
+        <!-- ✅ Status Logic -->
+        <td>
+            {% if app.status == 'Approved' and app.final_status != 'Final Approved' %}
+                Pending Principal Approval
+            {% elif app.final_status == 'Final Approved' %}
+                Approved ✅
+            {% elif app.final_status == 'Rejected by Principal' %}
+                Rejected ❌
+            {% else %}
+                {{ app.status }}
+            {% endif %}
+        </td>
+
+        <td>{{ app.applied_on }}</td>
+
+        <!-- ✅ Room Details -->
+        <td>
+            {% if app.final_status == 'Final Approved' %}
+                Block: {{ app.block }} | Floor: {{ app.floor_no }} | Room: {{ app.room_no }} | Bed: {{ app.bed_no }}
+            {% else %}
+                N/A
+            {% endif %}
+        </td>
+    </tr>
+    {% endfor %}
+</table>
+{% else %}
+<p>No hostel applications submitted yet.</p>
+{% endif %}
+
+<p>
+    <a href="/student/apply">Apply for Hostel</a> | 
+    <a href="/logout">Logout</a> | 
+    <a href="/">Home</a>
+</p>
+</div>
+<script>
+let now = new Date();
+let hour = now.getHours();
+let greeting = "";
+
+if(hour < 12) greeting = "Good Morning!";
+else if(hour < 18) greeting = "Good Afternoon!";
+else greeting = "Good Evening!";
+
+document.getElementById("greeting").innerText = greeting;
+</script>
+
+</body>
+</html>

@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Principal Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+
+<body>
+<div class="container">
+<h2>Welcome, {{ session['principal_name'] }}</h2>
+
+<h3>Statistics:</h3>
+<p>Total Registered Students: {{ total_students }}</p>
+<p>Total Students Applied for Hostel: {{ total_applications }}</p>
+
+<!-- Button to show full list -->
+<button onclick="document.getElementById('student_list').style.display='block'">
+    Show All Students Details
+</button>
+
+<!-- Full Details Table -->
+<div id="student_list" style="display:none; margin-top:20px;">
+<table border="1" cellpadding="5" cellspacing="0">
+    <tr>
+        <th>Photo</th>
+        <th>Signature</th>
+        <th>Name</th>
+        <th>Roll No</th>
+        <th>Branch</th>
+        <th>Semester</th>
+        <th>Gender</th>
+        <th>DOB</th>
+        <th>Email</th>
+        <th>Contact</th>
+        <th>Father</th>
+        <th>Mother</th>
+        <th>Parent Contact</th>
+        <th>Address</th>
+        <th>State Rank</th>
+        <th>Category</th>
+        <th>Category Rank</th>
+        <th>Income</th>
+        <th>Aadhaar</th>
+        <th>Hostel Name</th>
+        <th>Room Type</th>
+        <th>Distance</th>
+        <th>Reason</th>
+        <th>Status</th>
+        <th>Actions</th>
+    </tr>
+    {% for s in students %}
+    <tr>
+        <td>{% if s.photo %}<a href="{{ url_for('static', filename='uploads/photo/' + s.photo) }}" target="_blank"><img src="{{ url_for('static', filename='uploads/photo/' + s.photo) }}" width="80" height="80"></a>{% else %}N/A{% endif %}</td>
+        <td>{% if s.signature %}<a href="{{ url_for('static', filename='uploads/signature/' + s.signature) }}" target="_blank"><img src="{{ url_for('static', filename='uploads/signature/' + s.signature) }}" width="80" height="50"></a>{% else %}N/A{% endif %}</td>
+        <td>{{ s.name }}</td>
+        <td>{{ s.rollno }}</td>
+        <td>{{ s.branch }}</td>
+        <td>{{ s.semester }}</td>
+        <td>{{ s.gender }}</td>
+        <td>{{ s.dob }}</td>
+        <td>{{ s.email }}</td>
+        <td>{{ s.contact }}</td>
+        <td>{{ s.father }}</td>
+        <td>{{ s.mother }}</td>
+        <td>{{ s.parent_contact }}</td>
+        <td>{{ s.address }}</td>
+        <td>{{ s.rank }}</td>
+        <td>{{ s.category }}</td>
+        <td>{{ s.category_rank }}</td>
+        <td>{{ s.income }}</td>
+        <td>{% if s.aadhaar_file %}<a href="{{ url_for('static', filename='uploads/aadhaar/' + s.aadhaar_file) }}" target="_blank">View</a>{% else %}N/A{% endif %}</td>
+        <td>{{ s.hostel_name if s.hostel_name else 'N/A' }}</td>
+        <td>{{ s.room_type if s.room_type else 'N/A' }}</td>
+        <td>{{ s.distance if s.distance else 'N/A' }}</td>
+        <td>{{ s.reason if s.reason else 'N/A' }}</td>
+        <td>{{ s.application_status if s.application_status else 'Not Applied' }}</td>
+        <td>
+            {% if s.application_status == 'Approved' %}
+            <a href="/principal/final_approve/{{ s.application_id }}">Final Approve</a> |
+            <a href="/principal/final_reject/{{ s.application_id }}">Final Reject</a>
+            {% else %}N/A{% endif %}
+        </td>
+    </tr>
+    {% endfor %}
+</table>
+</div>
+
+<p><a href="/logout">Logout</a></p>
+
+</body>
+</html>
