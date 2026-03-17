@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>College Hostel Management System</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+<!-- ██████████  FIREBASE SDK  ██████████ -->
+<script type="module">
+  import { initializeApp }
+    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getAuth, createUserWithEmailAndPassword,
+           signInWithEmailAndPassword, signOut, onAuthStateChanged }
+    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+  import { getFirestore, doc, setDoc, getDoc,
+           collection, addDoc, query, where,
+           getDocs, serverTimestamp }
+    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+  import { getStorage, ref, uploadBytes, getDownloadURL }
+    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
+
+  /* ═══════════════════════════════════════════════════
+     🔧  PASTE YOUR FIREBASE CONFIG BELOW
+         https://console.firebase.google.com
+         Create project → Add Web App → Copy firebaseConfig
+     ═══════════════════════════════════════════════════ */
+  const firebaseConfig = {
+    apiKey:            "YOUR_API_KEY",
+    authDomain:        "YOUR_PROJECT_ID.firebaseapp.com",
+    projectId:         "YOUR_PROJECT_ID",
+    storageBucket:     "YOUR_PROJECT_ID.appspot.com",
+    messagingSenderId: "YOUR_SENDER_ID",
+    appId:             "YOUR_APP_ID"
+  };
+
+  const app     = initializeApp(firebaseConfig);
+  const auth    = getAuth(app);
+  const db      = getFirestore(app);
+  const storage = getStorage(app);
+
+  /* expose to non-module scripts */
+  window._fb = {
+    auth, db, storage,
+    createUserWithEmailAndPassword, signInWithEmailAndPassword,
+    signOut, onAuthStateChanged,
+    doc, setDoc, getDoc, collection, addDoc, query, where,
+    getDocs, serverTimestamp, ref, uploadBytes, getDownloadURL
+  };
+
+  /* auto-restore session */
+  onAuthStateChanged(auth, async user => {
+    if (!user) return;
+    const snap = await getDoc(doc(db, "students", user.uid));
+    if (snap.exists()) {
+      window._profile = snap.data();
+      renderDashboard(snap.data());
+      await loadHostelApps(user.uid);
+      showPage('dashboard');
+    }
+  });
+</script>
+
+<style>
+:root{
+  --navy:#0f1f3d;--gold:#c9a84c;--gold-light:#f0d07a;
+  --cream:#faf7f0;--white:#fff;--slate:#4a5568;
+  --light:#e8ecf2;--error:#e53e3e;--success:#38a169;
+  --sh:0 4px 24px rgba(15,31,61,.12);
+  --sh2:0 12px 48px rgba(15,31,61,.18);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--navy);min-height:100vh}
+.page{display:none;min-height:100vh}
+.page.active{display:flex;flex-direction:column}
+
+/* HEADER */
+.site-header{background:var(--navy);padding:16px 40px;display:flex;align-items:center;gap:20px;box-shadow:var(--sh)}
+.logo-circle{width:56px;height:56px;background:var(--gold);border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Playfair Display',serif;font-size:22px;font-weight:900;color:var(--navy);flex-shrink:0}
+.header-text h1{font-family:'Playfair Display',serif;font-size:20px;color:#fff;line-height:1.2}
+.header-text p{font-size:12px;color:var(--gold-light);letter-spacing:1.5px;text-transform:uppercase}
+.header-right{margin-left:auto}
+.btn-home{background:transparent;border:1.5px solid var(--gold);color:var(--gold);padding:8px 20px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;transition:all .2s}
+.btn-home:hover{background:var(--gold);color:var(--navy)}
+
+/* HOME */
+#home{background:linear-gradient(135deg,var(--navy) 0%,#1a3360 60%,#0f1f3d 100%);align-items:center;justify-content:center;position:relative;overflow:hidden}
+#home::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 70% 30%,rgba(201,168,76,.12),transparent 60%)}
+.home-content{text-align:center;z-index:1;padding:40px 20px}
+.home-logo{width:100px;height:100px;background:var(--gold);border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Playfair Display',serif;font-size:40px;font-weight:900;color:var(--navy);margin:0 auto 24px;box-shadow:0 0 0 12px rgba(201,168,76,.18)}
+.home-content h1{font-family:'Playfair Display',serif;font-size:clamp(28px,5vw,52px);color:#fff;line-height:1.15;margin-bottom:8px}
+.home-subtitle{color:var(--gold-light);font-size:15px;letter-spacing:2px;text-transform:uppercase;margin-bottom:48px}
+.login-cards{display:flex;gap:20px;flex-wrap:wrap;justify-content:center}
+.login-card{background:rgba(255,255,255,.06);border:1.5px solid rgba(201,168,76,.3);border-radius:16px;padding:32px 28px;width:200px;cursor:pointer;transition:all .3s;backdrop-filter:blur(8px)}
+.login-card:hover{background:rgba(201,168,76,.12);border-color:var(--gold);transform:translateY(-4px);box-shadow:0 16px 40px rgba(201,168,76,.15)}
+.login-card .icon{width:52px;height:52px;background:var(--gold);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:24px;margin:0 auto 16px}
+.login-card h3{font-family:'Playfair Display',serif;font-size:17px;color:#fff;margin-bottom:6px}
+.login-card p{font-size:12px;color:rgba(255,255,255,.5)}
+
+/* AUTH */
+.auth-wrap{flex:1;display:flex;align-items:center;padding:40px 0}
+.auth-container{max-width:640px;margin:0 auto;padding:20px;width:100%}
+.auth-box{background:#fff;border-radius:20px;padding:40px;box-shadow:var(--sh2);border:1px solid rgba(201,168,76,.15)}
+.auth-title{font-family:'Playfair Display',serif;font-size:28px;color:var(--navy);margin-bottom:6px}
+.auth-subtitle{font-size:14px;color:var(--slate);margin-bottom:28px}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.form-group{margin-bottom:16px}
+.form-group.full{grid-column:1/-1}
+label{display:block;font-size:12px;font-weight:600;color:var(--slate);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px}
+input,select{width:100%;padding:11px 14px;border:1.5px solid var(--light);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:14px;color:var(--navy);background:#fff;transition:border-color .2s;outline:none}
+input:focus,select:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(201,168,76,.12)}
+input[type=file]{padding:10px;cursor:pointer;border:2px dashed var(--light);color:var(--slate);font-size:13px}
+input[type=file]:hover{border-color:var(--gold)}
+.section-heading{font-family:'Playfair Display',serif;font-size:15px;color:var(--navy);margin:22px 0 12px;padding-bottom:6px;border-bottom:2px solid var(--gold);display:inline-block}
+.btn-primary{width:100%;background:var(--navy);color:#fff;border:none;border-radius:10px;padding:13px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;cursor:pointer;transition:all .2s;margin-top:6px}
+.btn-primary:hover{background:#1a3360;box-shadow:var(--sh);transform:translateY(-1px)}
+.btn-primary:disabled{background:#aaa;cursor:not-allowed;transform:none}
+.btn-gold{background:var(--gold);color:var(--navy)}
+.btn-gold:hover{background:var(--gold-light)}
+.auth-footer{text-align:center;margin-top:18px;font-size:14px;color:var(--slate)}
+.auth-footer a{color:var(--gold);cursor:pointer;font-weight:600}
+.divider{text-align:center;margin:18px 0;position:relative;font-size:13px;color:var(--slate)}
+.divider::before,.divider::after{content:'';position:absolute;top:50%;width:42%;height:1px;background:var(--light)}
+.divider::before{left:0}.divider::after{right:0}
+.scroll-form{max-height:56vh;overflow-y:auto;padding-right:6px}
+.scroll-form::-webkit-scrollbar{width:4px}
+.scroll-form::-webkit-scrollbar-thumb{background:var(--gold);border-radius:4px}
+
+/* SPINNER */
+.spinner{display:inline-block;width:16px;height:16px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:8px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* DASHBOARD */
+#dashboard,#warden-dashboard{background:var(--cream)}
+.dash-header{background:var(--navy);padding:0 40px;display:flex;align-items:center;height:64px}
+.dash-header .logo-circle{width:40px;height:40px;font-size:16px}
+.dash-header h2{font-family:'Playfair Display',serif;font-size:17px;color:#fff;margin-left:12px}
+.spacer{flex:1}
+.btn-logout{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:#fff;padding:8px 18px;border-radius:6px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:13px;transition:all .2s}
+.btn-logout:hover{background:rgba(229,62,62,.3);border-color:#e53e3e}
+.dash-body{flex:1;padding:32px 40px;max-width:1100px;margin:0 auto;width:100%}
+
+.greeting-banner{background:linear-gradient(120deg,var(--navy),#1a3360);border-radius:20px;padding:32px 36px;display:flex;align-items:center;gap:24px;margin-bottom:32px;position:relative;overflow:hidden}
+.greeting-banner::after{content:'';position:absolute;right:-20px;top:-20px;width:180px;height:180px;border-radius:50%;background:rgba(201,168,76,.08)}
+.avatar{width:80px;height:80px;border-radius:50%;background:var(--gold);border:3px solid var(--gold-light);display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:700;color:var(--navy);flex-shrink:0;overflow:hidden}
+.avatar img{width:100%;height:100%;object-fit:cover}
+.gr-text h2{font-family:'Playfair Display',serif;font-size:24px;color:#fff}
+.gr-text h2 span{color:var(--gold-light)}
+.gr-text p{color:rgba(255,255,255,.6);font-size:13px;margin-top:4px}
+
+.dash-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:28px}
+.dash-card{background:#fff;border-radius:16px;padding:28px;box-shadow:var(--sh);border:1px solid rgba(201,168,76,.1)}
+.dash-card h3{font-family:'Playfair Display',serif;font-size:18px;margin-bottom:18px;color:var(--navy);display:flex;align-items:center;gap:8px}
+.dash-card h3::after{content:'';flex:1;height:2px;background:linear-gradient(to right,var(--gold),transparent)}
+.drow{display:flex;padding:8px 0;border-bottom:1px solid var(--light);font-size:14px}
+.drow:last-child{border-bottom:none}
+.dlabel{width:148px;color:var(--slate);font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;flex-shrink:0}
+.dval{color:var(--navy);font-weight:500;word-break:break-word}
+.doc-chip{display:inline-flex;align-items:center;gap:5px;background:var(--light);padding:4px 10px;border-radius:20px;font-size:12px;color:var(--navy);text-decoration:none;margin:3px}
+.doc-chip:hover{background:var(--gold-light)}
+
+.hostel-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{background:var(--navy);color:var(--gold-light);padding:10px 12px;text-align:left;font-size:11px;letter-spacing:.8px;text-transform:uppercase;font-weight:600}
+th:first-child{border-radius:8px 0 0 0}th:last-child{border-radius:0 8px 0 0}
+td{padding:10px 12px;border-bottom:1px solid var(--light)}
+tr:hover td{background:rgba(201,168,76,.04)}
+.badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600}
+.badge-pending{background:#fef3c7;color:#92400e}
+.badge-approved{background:#d1fae5;color:#065f46}
+.badge-rejected{background:#fee2e2;color:#991b1b}
+.btn-apply{background:var(--gold);color:var(--navy);border:none;border-radius:8px;padding:12px 28px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;cursor:pointer;transition:all .2s;margin-top:20px}
+.btn-apply:hover{background:var(--gold-light);transform:translateY(-1px);box-shadow:var(--sh)}
+
+/* MODAL */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(15,31,61,.6);backdrop-filter:blur(4px);z-index:999;align-items:center;justify-content:center}
+.modal-overlay.open{display:flex}
+.modal{background:#fff;border-radius:20px;padding:40px;width:90%;max-width:520px;box-shadow:var(--sh2);max-height:90vh;overflow-y:auto}
+.modal h3{font-family:'Playfair Display',serif;font-size:22px;margin-bottom:24px;color:var(--navy)}
+.modal-footer{display:flex;gap:12px;margin-top:24px}
+.btn-cancel{flex:1;background:var(--light);color:var(--slate);border:none;border-radius:8px;padding:12px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;cursor:pointer}
+.btn-cancel:hover{background:#d1d5db}
+
+/* CONFIG WARNING */
+.cfg-warn{background:#fff3cd;border:1.5px solid #f0c040;border-radius:10px;padding:14px 18px;margin-bottom:20px;font-size:13px;color:#7c5a00;display:none}
+.cfg-warn strong{display:block;margin-bottom:4px}
+
+/* TOAST */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--navy);color:#fff;padding:13px 20px;border-radius:10px;font-size:14px;font-weight:500;box-shadow:var(--sh2);z-index:9999;display:none;border-left:4px solid var(--gold);max-width:320px;animation:up .3s ease}
+.toast.show{display:block}
+.toast.err{border-left-color:var(--error)}
+.toast.ok{border-left-color:var(--success)}
+@keyframes up{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
+
+/* WARDEN ACTION BTNS */
+.act-btn{border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600;margin-right:4px}
+.act-approve{background:#d1fae5;color:#065f46}
+.act-reject{background:#fee2e2;color:#991b1b}
+
+@media(max-width:768px){
+  .site-header,.dash-header{padding:14px 20px}
+  .dash-body{padding:20px}
+  .dash-grid{grid-template-columns:1fr}
+  .form-row{grid-template-columns:1fr}
+  .login-cards{gap:14px}
+  .login-card{width:160px;padding:24px 18px}
+  .auth-box{padding:24px 18px}
+  .greeting-banner{flex-direction:column;text-align:center}
+}
+</style>
+</head>
+<body>
+
+<!-- ══════════════  HOME  ══════════════ -->
+<div id="home" class="page active">
+  <div class="home-content">
+    <div class="home-logo">🎓</div>
+    <h1>College Hostel<br>Management System</h1>
+    <p class="home-subtitle">Smart. Seamless. Secure.</p>
+    <div class="login-cards">
+      <div class="login-card" onclick="showPage('student-login')">
+        <div class="icon">👨‍🎓</div><h3>Student</h3><p>Login with email</p>
+      </div>
+      <div class="login-card" onclick="showPage('warden-login')">
+        <div class="icon">🏠</div><h3>Warden</h3><p>Hostel management</p>
+      </div>
+      <div class="login-card" onclick="showPage('principal-login')">
+        <div class="icon">🏛️</div><h3>Principal</h3><p>Institute oversight</p>
+      </div>
+      <div class="login-card" onclick="showPage('admin-login')">
+        <div class="icon">⚙️</div><h3>Admin</h3><p>System management</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════  STUDENT LOGIN  ══════════════ -->
+<div id="student-login" class="page">
+  <header class="site-header">
+    <div class="logo-circle">🎓</div>
+    <div class="header-text"><h1>College Hostel Management</h1><p>Student Portal</p></div>
+    <div class="header-right"><button class="btn-home" onclick="showPage('home')">🏠 Home</button></div>
+  </header>
+  <div class="auth-wrap">
+    <div class="auth-container">
+      <div class="auth-box">
+        <div class="cfg-warn" id="warn-login">
+          <strong>⚠️ Firebase not configured yet</strong>
+          Paste your Firebase config at the top of this file to enable real login/register.
+        </div>
+        <div class="auth-title">Student Login</div>
+        <div class="auth-subtitle">Enter your email and password</div>
+        <div class="form-group"><label>Email Address</label>
+          <input type="email" id="li-email" placeholder="yourname@email.com"></div>
+        <div class="form-group"><label>Password</label>
+          <input type="password" id="li-pass" placeholder="Your password"></div>
+        <button class="btn-primary" id="li-btn" onclick="doStudentLogin()">Login to Dashboard</button>
+        <div class="divider">OR</div>
+        <button class="btn-primary btn-gold" onclick="showPage('student-register')">Create New Account</button>
+        <div class="auth-footer"><a onclick="showPage('home')">← Back to Home</a></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════  STUDENT REGISTER  ══════════════ -->
+<div id="student-register" class="page">
+  <header class="site-header">
+    <div class="logo-circle">🎓</div>
+    <div class="header-text"><h1>College Hostel Management</h1><p>Student Registration</p></div>
+    <div class="header-right"><button class="btn-home" onclick="showPage('home')">🏠 Home</button></div>
+  </header>
+  <div class="auth-wrap" style="align-items:flex-start;padding:28px 0">
+    <div class="auth-container" style="max-width:740px">
+      <div class="auth-box">
+        <div class="auth-title">Student Registration</div>
+        <div class="auth-subtitle">All fields marked * are required</div>
+        <div class="scroll-form">
+
+          <div class="section-heading">Personal Information</div>
+          <div class="form-row">
+            <div class="form-group full"><label>Full Name *</label>
+              <input type="text" id="r-name" placeholder="As per school certificate"></div>
+            <div class="form-group"><label>Select Branch *</label>
+              <select id="r-branch"><option value="">Choose Branch</option>
+                <option>Computer Science &amp; Engg.</option>
+                <option>Information Technology</option>
+                <option>Electronics &amp; Comm.</option>
+                <option>Mechanical Engineering</option>
+                <option>Civil Engineering</option>
+                <option>Electrical Engineering</option></select></div>
+            <div class="form-group"><label>Select Semester *</label>
+              <select id="r-sem"><option value="">Choose Semester</option>
+                <option>Semester 1</option><option>Semester 2</option>
+                <option>Semester 3</option><option>Semester 4</option>
+                <option>Semester 5</option><option>Semester 6</option>
+                <option>Semester 7</option><option>Semester 8</option></select></div>
+            <div class="form-group"><label>College Roll No. *</label>
+              <input type="text" id="r-roll" placeholder="e.g. 2024CS001"></div>
+            <div class="form-group"><label>Select Gender *</label>
+              <select id="r-gender"><option value="">Choose</option>
+                <option>Male</option><option>Female</option><option>Other</option></select></div>
+            <div class="form-group"><label>Date of Birth *</label>
+              <input type="date" id="r-dob"></div>
+            <div class="form-group"><label>Email Address *</label>
+              <input type="email" id="r-email" placeholder="yourname@email.com"></div>
+            <div class="form-group"><label>Create Password *</label>
+              <input type="password" id="r-pass" placeholder="Min 8 characters"></div>
+            <div class="form-group"><label>Contact Number *</label>
+              <input type="tel" id="r-contact" placeholder="10-digit mobile"></div>
+          </div>
+
+          <div class="section-heading">Family Details</div>
+          <div class="form-row">
+            <div class="form-group"><label>Father's Name *</label>
+              <input type="text" id="r-father" placeholder="Father's full name"></div>
+            <div class="form-group"><label>Mother's Name *</label>
+              <input type="text" id="r-mother" placeholder="Mother's full name"></div>
+            <div class="form-group"><label>Parent Contact No. *</label>
+              <input type="tel" id="r-pcontact" placeholder="Parent's mobile"></div>
+            <div class="form-group"><label>Full Address *</label>
+              <input type="text" id="r-address" placeholder="House, Street, City, State"></div>
+          </div>
+
+          <div class="section-heading">Academic &amp; Category</div>
+          <div class="form-row">
+            <div class="form-group"><label>State Rank</label>
+              <input type="number" id="r-strank" placeholder="Your state rank"></div>
+            <div class="form-group"><label>Select Category *</label>
+              <select id="r-cat"><option value="">Choose</option>
+                <option>General</option><option>OBC</option>
+                <option>SC</option><option>ST</option><option>EWS</option></select></div>
+            <div class="form-group"><label>Category Rank</label>
+              <input type="number" id="r-catrank" placeholder="Rank in category"></div>
+            <div class="form-group"><label>Family Annual Income (₹)</label>
+              <input type="number" id="r-income" placeholder="Annual income"></div>
+            <div class="form-group full"><label>Aadhaar Number *</label>
+              <input type="text" id="r-aadhaar" placeholder="12-digit Aadhaar" maxlength="12"></div>
+          </div>
+
+          <div class="section-heading">Document Uploads</div>
+          <div class="form-row">
+            <div class="form-group"><label>Student Photo *</label>
+              <input type="file" id="f-photo" accept="image/*"></div>
+            <div class="form-group"><label>Student Signature *</label>
+              <input type="file" id="f-sig" accept="image/*"></div>
+            <div class="form-group"><label>Aadhaar Card *</label>
+              <input type="file" id="f-aadhaar" accept=".pdf,image/*"></div>
+            <div class="form-group"><label>Hostel Fee Receipt</label>
+              <input type="file" id="f-hfee" accept=".pdf,image/*"></div>
+            <div class="form-group"><label>Admission Fee Receipt</label>
+              <input type="file" id="f-afee" accept=".pdf,image/*"></div>
+            <div class="form-group"><label>Income Certificate</label>
+              <input type="file" id="f-inc" accept=".pdf,image/*"></div>
+          </div>
+        </div>
+
+        <button class="btn-primary" id="reg-btn" onclick="doRegister()" style="margin-top:22px">
+          Register Account
+        </button>
+        <div class="auth-footer">Already registered? <a onclick="showPage('student-login')">Login here</a></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════  WARDEN LOGIN  ══════════════ -->
+<div id="warden-login" class="page">
+  <header class="site-header">
+    <div class="logo-circle">🎓</div>
+    <div class="header-text"><h1>College Hostel Management</h1><p>Warden Portal</p></div>
+    <div class="header-right"><button class="btn-home" onclick="showPage('home')">🏠 Home</button></div>
+  </header>
+  <div class="auth-wrap">
+    <div class="auth-container">
+      <div class="auth-box">
+        <div class="auth-title">Warden Login</div>
+        <div class="auth-subtitle">Access hostel management dashboard</div>
+        <div class="form-group"><label>Email Address</label>
+          <input type="email" id="w-email" placeholder="warden@college.edu"></div>
+        <div class="form-group"><label>Password</label>
+          <input type="password" id="w-pass" placeholder="Enter password"></div>
+        <button class="btn-primary" id="w-btn" onclick="doWardenLogin()">Login</button>
+        <div class="auth-footer"><a onclick="showPage('home')">← Back to Home</a></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════  PRINCIPAL LOGIN  ══════════════ -->
+<div id="principal-login" class="page">
+  <header class="site-header">
+    <div class="logo-circle">🎓</div>
+    <div class="header-text"><h1>College Hostel Management</h1><p>Principal Portal</p></div>
+    <div class="header-right"><button class="btn-home" onclick="showPage('home')">🏠 Home</button></div>
+  </header>
+  <div class="auth-wrap">
+    <div class="auth-container">
+      <div class="auth-box">
+        <div class="auth-title">Principal Login</div>
+        <div class="auth-subtitle">Institute oversight and approvals</div>
+        <div class="form-group"><label>Email Address</label>
+          <input type="email" placeholder="principal@college.edu"></div>
+        <div class="form-group"><label>Password</label>
+          <input type="password" placeholder="Enter password"></div>
+        <button class="btn-primary" onclick="toast('Principal portal — coming soon!','err')">Login</button>
+        <div class="auth-footer"><a onclick="showPage('home')">← Back to Home</a></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════  ADMIN LOGIN  ══════════════ -->
+<div id="admin-login" class="page">
+  <header class="site-header">
+    <div class="logo-circle">🎓</div>
+    <div class="header-text"><h1>College Hostel Management</h1><p>Admin Portal</p></div>
+    <div class="header-right"><button class="btn-home" onclick="showPage('home')">🏠 Home</button></div>
+  </header>
+  <div class="auth-wrap">
+    <div class="auth-container">
+      <div class="auth-box">
+        <div class="auth-title">Admin Login</div>
+        <div class="auth-subtitle">System administration</div>
+        <div class="form-group"><label>Username</label>
+          <input type="text" placeholder="admin@college.edu"></div>
+        <div class="form-group"><label>Password</label>
+          <input type="password" placeholder="Enter password"></div>
+        <button class="btn-primary" onclick="toast('Admin portal — coming soon!','err')">Login</button>
+        <div class="auth-footer"><a onclick="showPage('home')">← Back to Home</a></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════  STUDENT DASHBOARD  ══════════════ -->
+<div id="dashboard" class="page">
+  <header class="dash-header">
+    <div class="logo-circle" style="width:40px;height:40px;font-size:16px">🎓</div>
+    <h2 style="margin-left:12px">College Hostel Management</h2>
+    <div class="spacer"></div>
+    <button class="btn-logout" onclick="doLogout()">Logout →</button>
+  </header>
+  <div class="dash-body">
+
+    <div class="greeting-banner">
+      <div class="avatar" id="d-avatar">?</div>
+      <div class="gr-text">
+        <h2 id="d-greeting">Good Morning! <span id="d-name">Student</span> 👋</h2>
+        <p>Welcome to your student dashboard &nbsp;•&nbsp; Roll No: <strong id="d-roll">—</strong></p>
+      </div>
+    </div>
+
+    <div class="dash-grid">
+      <div class="dash-card">
+        <h3>🎓 Academic Details</h3>
+        <div class="drow"><span class="dlabel">Branch</span><span class="dval" id="d-branch">—</span></div>
+        <div class="drow"><span class="dlabel">Semester</span><span class="dval" id="d-sem">—</span></div>
+        <div class="drow"><span class="dlabel">Roll No.</span><span class="dval" id="d-rollno">—</span></div>
+        <div class="drow"><span class="dlabel">Gender</span><span class="dval" id="d-gender">—</span></div>
+        <div class="drow"><span class="dlabel">Date of Birth</span><span class="dval" id="d-dob">—</span></div>
+        <div class="drow"><span class="dlabel">State Rank</span><span class="dval" id="d-strank">—</span></div>
+        <div class="drow"><span class="dlabel">Category</span><span class="dval" id="d-cat">—</span></div>
+        <div class="drow"><span class="dlabel">Category Rank</span><span class="dval" id="d-catrank">—</span></div>
+        <div class="drow"><span class="dlabel">Annual Income</span><span class="dval" id="d-income">—</span></div>
+        <div class="drow"><span class="dlabel">Aadhaar</span><span class="dval" id="d-aadhaar">—</span></div>
+      </div>
+      <div class="dash-card">
+        <h3>📋 Personal Details</h3>
+        <div class="drow"><span class="dlabel">Email</span><span class="dval" id="d-email">—</span></div>
+        <div class="drow"><span class="dlabel">Contact</span><span class="dval" id="d-contact">—</span></div>
+        <div class="drow"><span class="dlabel">Father's Name</span><span class="dval" id="d-father">—</span></div>
+        <div class="drow"><span class="dlabel">Mother's Name</span><span class="dval" id="d-mother">—</span></div>
+        <div class="drow"><span class="dlabel">Parent Contact</span><span class="dval" id="d-pcontact">—</span></div>
+        <div class="drow"><span class="dlabel">Address</span><span class="dval" id="d-address">—</span></div>
+        <div class="drow"><span class="dlabel">Documents</span><span class="dval" id="d-docs">—</span></div>
+      </div>
+    </div>
+
+    <div class="dash-card" style="margin-bottom:24px">
+      <h3>🏠 Hostel Applications</h3>
+      <div class="hostel-wrap">
+        <table>
+          <thead><tr>
+            <th>Hostel Name</th><th>Room Type</th><th>Reason</th>
+            <th>Distance (km)</th><th>Status</th><th>Applied On</th><th>Block/Floor/Room/Bed</th>
+          </tr></thead>
+          <tbody id="app-tbody">
+            <tr><td colspan="7" style="text-align:center;color:var(--slate);padding:24px;font-style:italic">
+              No applications yet.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <button class="btn-apply" onclick="openModal()">+ Apply for Hostel</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════  WARDEN DASHBOARD  ══════════════ -->
+<div id="warden-dashboard" class="page">
+  <header class="dash-header">
+    <div class="logo-circle" style="width:40px;height:40px;font-size:16px">🎓</div>
+    <h2 style="margin-left:12px">Warden Dashboard</h2>
+    <div class="spacer"></div>
+    <button class="btn-logout" onclick="doLogout()">Logout →</button>
+  </header>
+  <div class="dash-body">
+    <div class="greeting-banner">
+      <div class="avatar">🏠</div>
+      <div class="gr-text">
+        <h2 id="w-greeting">Good Morning! <span>Warden</span> 👋</h2>
+        <p>Manage hostel applications and student allocations</p>
+      </div>
+    </div>
+    <div class="dash-card">
+      <h3>📋 All Hostel Applications</h3>
+      <div class="hostel-wrap">
+        <table>
+          <thead><tr>
+            <th>Student</th><th>Roll No</th><th>Hostel</th><th>Room Type</th>
+            <th>Distance</th><th>Status</th><th>Applied On</th><th>Actions</th>
+          </tr></thead>
+          <tbody id="w-tbody">
+            <tr><td colspan="8" style="text-align:center;color:var(--slate);padding:24px">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════  HOSTEL MODAL  ══════════════ -->
+<div class="modal-overlay" id="hostel-modal">
+  <div class="modal">
+    <h3>🏠 Apply for Hostel</h3>
+    <div class="form-group"><label>Hostel Name *</label>
+      <select id="h-name"><option value="">Select Hostel</option>
+        <option>Boys Hostel A</option><option>Boys Hostel B</option>
+        <option>Girls Hostel A</option><option>Girls Hostel B</option></select></div>
+    <div class="form-group"><label>Room Type *</label>
+      <select id="h-room"><option value="">Select Room Type</option>
+        <option>Single Occupancy</option>
+        <option>Double Occupancy</option>
+        <option>Triple Occupancy</option></select></div>
+    <div class="form-group"><label>Reason *</label>
+      <input type="text" id="h-reason" placeholder="e.g. Distance from home"></div>
+    <div class="form-group"><label>Distance from Home (km) *</label>
+      <input type="number" id="h-dist" placeholder="e.g. 120"></div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" id="apply-btn" style="flex:2;margin-top:0"
+              onclick="submitApplication()">Submit Application</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toastEl"></div>
+
+<!-- ══════════════  JAVASCRIPT  ══════════════ -->
+<script>
+/* ─── navigation ─── */
+function showPage(id){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo(0,0);
+}
+
+/* ─── toast ─── */
+function toast(msg, type=''){
+  const el=document.getElementById('toastEl');
+  el.textContent=msg; el.className='toast show';
+  if(type) el.classList.add(type);
+  setTimeout(()=>el.classList.remove('show'), 3500);
+}
+
+/* ─── greeting ─── */
+function greeting(){
+  const h=new Date().getHours();
+  return h<12?'Good Morning!':h<17?'Good Afternoon!':'Good Evening!';
+}
+
+/* ─── firebase guard ─── */
+function fb(){ return window._fb||null; }
+
+/* ─── upload helper ─── */
+async function uploadFile(file, path){
+  const f=fb(); if(!f||!file) return null;
+  const r=f.ref(f.storage, path);
+  await f.uploadBytes(r, file);
+  return f.getDownloadURL(r);
+}
+
+/* ─── REGISTER ─── */
+async function doRegister(){
+  const f=fb();
+  if(!f){ toast('Firebase not configured. See setup comment in file.','err'); return; }
+  const btn=document.getElementById('reg-btn');
+
+  const v={
+    name: document.getElementById('r-name').value.trim(),
+    branch: document.getElementById('r-branch').value,
+    semester: document.getElementById('r-sem').value,
+    rollNo: document.getElementById('r-roll').value.trim(),
+    gender: document.getElementById('r-gender').value,
+    dob: document.getElementById('r-dob').value,
+    email: document.getElementById('r-email').value.trim(),
+    pass: document.getElementById('r-pass').value,
+    contact: document.getElementById('r-contact').value.trim(),
+    father: document.getElementById('r-father').value.trim(),
+    mother: document.getElementById('r-mother').value.trim(),
+    pcontact: document.getElementById('r-pcontact').value.trim(),
+    address: document.getElementById('r-address').value.trim(),
+    stateRank: document.getElementById('r-strank').value||'',
+    category: document.getElementById('r-cat').value,
+    catRank: document.getElementById('r-catrank').value||'',
+    annualIncome: document.getElementById('r-income').value||'',
+    aadhaar: document.getElementById('r-aadhaar').value.trim(),
+  };
+
+  const req=['name','branch','semester','rollNo','gender','dob','email','pass','contact','father','mother','pcontact','address','category','aadhaar'];
+  if(req.some(k=>!v[k])){ toast('Please fill all required (*) fields','err'); return; }
+  if(v.pass.length<8){ toast('Password must be at least 8 characters','err'); return; }
+  if(v.aadhaar.length!==12){ toast('Aadhaar must be exactly 12 digits','err'); return; }
+
+  btn.disabled=true;
+  btn.innerHTML='<span class="spinner"></span>Creating account...';
+
+  try {
+    const cred = await f.createUserWithEmailAndPassword(f.auth, v.email, v.pass);
+    const uid  = cred.user.uid;
+
+    toast('Uploading documents...');
+    const docs={};
+    const uploads=[
+      ['f-photo','photoURL'],['f-sig','signatureURL'],
+      ['f-aadhaar','aadhaarURL'],['f-hfee','hostelFeeURL'],
+      ['f-afee','admissionFeeURL'],['f-inc','incomeURL']
+    ];
+    for(const[id,key] of uploads){
+      const file=document.getElementById(id).files[0];
+      if(file) docs[key]=await uploadFile(file,`students/${uid}/${key}_${Date.now()}`);
+    }
+
+    const {pass:_, ...safe}=v;
+    await f.setDoc(f.doc(f.db,'students',uid),{
+      ...safe,...docs, uid, role:'student', createdAt:f.serverTimestamp()
+    });
+
+    toast('Registration successful! Please login.','ok');
+    setTimeout(()=>showPage('student-login'),1500);
+  } catch(e){
+    const m = e.code==='auth/email-already-in-use'?'Email already registered.'
+            : e.code==='auth/invalid-email'?'Invalid email address.'
+            : e.message;
+    toast(m,'err');
+  } finally {
+    btn.disabled=false; btn.innerHTML='Register Account';
+  }
+}
+
+/* ─── STUDENT LOGIN ─── */
+async function doStudentLogin(){
+  const f=fb();
+  if(!f){ toast('Firebase not configured.','err'); return; }
+  const btn=document.getElementById('li-btn');
+  const email=document.getElementById('li-email').value.trim();
+  const pass=document.getElementById('li-pass').value;
+  if(!email||!pass){ toast('Enter email and password','err'); return; }
+
+  btn.disabled=true;
+  btn.innerHTML='<span class="spinner"></span>Logging in...';
+  try {
+    const cred=await f.signInWithEmailAndPassword(f.auth, email, pass);
+    const snap=await f.getDoc(f.doc(f.db,'students',cred.user.uid));
+    if(!snap.exists()){ toast('Student profile not found. Please register.','err'); return; }
+    window._profile=snap.data();
+    renderDashboard(snap.data());
+    await loadHostelApps(cred.user.uid);
+    showPage('dashboard');
+    toast(greeting()+' Welcome back!','ok');
+  } catch(e){
+    const m = e.code==='auth/user-not-found'||e.code==='auth/invalid-credential'
+            ? 'Invalid email or password.' : e.message;
+    toast(m,'err');
+  } finally {
+    btn.disabled=false; btn.innerHTML='Login to Dashboard';
+  }
+}
+
+/* ─── WARDEN LOGIN ─── */
+async function doWardenLogin(){
+  const f=fb();
+  if(!f){ toast('Firebase not configured.','err'); return; }
+  const btn=document.getElementById('w-btn');
+  const email=document.getElementById('w-email').value.trim();
+  const pass=document.getElementById('w-pass').value;
+  if(!email||!pass){ toast('Enter email and password','err'); return; }
+
+  btn.disabled=true;
+  btn.innerHTML='<span class="spinner"></span>Logging in...';
+  try {
+    const cred=await f.signInWithEmailAndPassword(f.auth, email, pass);
+    const snap=await f.getDoc(f.doc(f.db,'staff',cred.user.uid));
+    if(!snap.exists()||snap.data().role!=='warden'){
+      await f.signOut(f.auth);
+      toast('Warden account not found. Contact admin.','err'); return;
+    }
+    document.getElementById('w-greeting').innerHTML=
+      greeting()+' <span>'+snap.data().name+'</span> 👋';
+    await loadAllApps();
+    showPage('warden-dashboard');
+    toast('Welcome, Warden!','ok');
+  } catch(e){
+    toast(e.message,'err');
+  } finally {
+    btn.disabled=false; btn.innerHTML='Login';
+  }
+}
+
+/* ─── RENDER STUDENT DASHBOARD ─── */
+function renderDashboard(p){
+  document.getElementById('d-greeting').innerHTML=
+    greeting()+' <span id="d-name">'+p.name+'</span> 👋';
+  document.getElementById('d-roll').textContent=p.rollNo||'—';
+  const av=document.getElementById('d-avatar');
+  if(p.photoURL) av.innerHTML=`<img src="${p.photoURL}" alt="photo">`;
+  else av.textContent=(p.name||'?').substring(0,2).toUpperCase();
+
+  const m={
+    'd-branch':p.branch,'d-sem':p.semester,'d-rollno':p.rollNo,
+    'd-gender':p.gender,'d-dob':p.dob,'d-strank':p.stateRank||'—',
+    'd-cat':p.category,'d-catrank':p.catRank||'—',
+    'd-income':p.annualIncome?'₹ '+Number(p.annualIncome).toLocaleString('en-IN'):'—',
+    'd-aadhaar':p.aadhaar?p.aadhaar.slice(0,-4).replace(/\d/g,'X')+p.aadhaar.slice(-4):'—',
+    'd-email':p.email,'d-contact':p.contact,
+    'd-father':p.father,'d-mother':p.mother,
+    'd-pcontact':p.pcontact,'d-address':p.address
+  };
+  Object.entries(m).forEach(([id,val])=>{
+    const el=document.getElementById(id); if(el) el.textContent=val||'—';
+  });
+
+  const links=[];
+  if(p.photoURL) links.push(`<a class="doc-chip" href="${p.photoURL}" target="_blank">📷 Photo</a>`);
+  if(p.signatureURL) links.push(`<a class="doc-chip" href="${p.signatureURL}" target="_blank">✍ Signature</a>`);
+  if(p.aadhaarURL) links.push(`<a class="doc-chip" href="${p.aadhaarURL}" target="_blank">🪪 Aadhaar</a>`);
+  if(p.hostelFeeURL) links.push(`<a class="doc-chip" href="${p.hostelFeeURL}" target="_blank">🧾 Hostel Fee</a>`);
+  if(p.admissionFeeURL) links.push(`<a class="doc-chip" href="${p.admissionFeeURL}" target="_blank">📄 Admission Fee</a>`);
+  if(p.incomeURL) links.push(`<a class="doc-chip" href="${p.incomeURL}" target="_blank">📑 Income Cert.</a>`);
+  document.getElementById('d-docs').innerHTML=links.length?links.join(''):'No documents uploaded';
+}
+
+/* ─── LOAD STUDENT APPLICATIONS ─── */
+async function loadHostelApps(uid){
+  const f=fb(); if(!f) return;
+  try {
+    const q=f.query(f.collection(f.db,'hostelApplications'),f.where('uid','==',uid));
+    const snap=await f.getDocs(q);
+    const apps=[]; snap.forEach(d=>apps.push({id:d.id,...d.data()}));
+    renderApps(apps);
+  } catch(e){ console.error(e); }
+}
+
+function renderApps(apps){
+  const tb=document.getElementById('app-tbody');
+  if(!apps.length){
+    tb.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--slate);padding:24px;font-style:italic">No hostel applications yet.</td></tr>';
+    return;
+  }
+  tb.innerHTML=apps.map(a=>`<tr>
+    <td>${a.hostelName}</td><td>${a.roomType}</td><td>${a.reason}</td>
+    <td>${a.distance}</td>
+    <td><span class="badge badge-${(a.status||'pending').toLowerCase()}">${a.status||'Pending'}</span></td>
+    <td>${a.appliedOn||'—'}</td><td>${a.allocation||'—'}</td>
+  </tr>`).join('');
+}
+
+/* ─── SUBMIT APPLICATION ─── */
+async function submitApplication(){
+  const f=fb();
+  if(!f){ toast('Firebase not configured.','err'); return; }
+  const user=f.auth.currentUser;
+  if(!user){ toast('Please login first','err'); return; }
+
+  const hn=document.getElementById('h-name').value;
+  const rt=document.getElementById('h-room').value;
+  const rs=document.getElementById('h-reason').value.trim();
+  const ds=document.getElementById('h-dist').value.trim();
+  if(!hn||!rt||!rs||!ds){ toast('Please fill all fields','err'); return; }
+
+  const btn=document.getElementById('apply-btn');
+  btn.disabled=true;
+  btn.innerHTML='<span class="spinner"></span>Submitting...';
+  try {
+    const today=new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+    await f.addDoc(f.collection(f.db,'hostelApplications'),{
+      uid:user.uid,
+      studentName:window._profile?.name||'',
+      rollNo:window._profile?.rollNo||'',
+      hostelName:hn, roomType:rt, reason:rs, distance:ds,
+      status:'Pending', allocation:'—', appliedOn:today,
+      createdAt:f.serverTimestamp()
+    });
+    closeModal();
+    await loadHostelApps(user.uid);
+    toast('Application submitted!','ok');
+    ['h-name','h-room','h-reason','h-dist'].forEach(id=>document.getElementById(id).value='');
+  } catch(e){ toast(e.message,'err'); }
+  finally { btn.disabled=false; btn.innerHTML='Submit Application'; }
+}
+
+/* ─── LOAD ALL APPS (WARDEN) ─── */
+async function loadAllApps(){
+  const f=fb(); if(!f) return;
+  try {
+    const snap=await f.getDocs(f.collection(f.db,'hostelApplications'));
+    const apps=[]; snap.forEach(d=>apps.push({id:d.id,...d.data()}));
+    const tb=document.getElementById('w-tbody');
+    if(!apps.length){
+      tb.innerHTML='<tr><td colspan="8" style="text-align:center;color:var(--slate);padding:24px">No applications found.</td></tr>';
+      return;
+    }
+    tb.innerHTML=apps.map(a=>`<tr>
+      <td>${a.studentName||'—'}</td><td>${a.rollNo||'—'}</td>
+      <td>${a.hostelName}</td><td>${a.roomType}</td><td>${a.distance} km</td>
+      <td><span class="badge badge-${(a.status||'pending').toLowerCase()}">${a.status||'Pending'}</span></td>
+      <td>${a.appliedOn||'—'}</td>
+      <td>
+        <button class="act-btn act-approve" onclick="updateAppStatus('${a.id}','Approved')">✓ Approve</button>
+        <button class="act-btn act-reject"  onclick="updateAppStatus('${a.id}','Rejected')">✗ Reject</button>
+      </td>
+    </tr>`).join('');
+  } catch(e){ console.error(e); }
+}
+
+/* ─── UPDATE STATUS (WARDEN) ─── */
+async function updateAppStatus(id, status){
+  const f=fb(); if(!f) return;
+  try {
+    await f.setDoc(f.doc(f.db,'hostelApplications',id),{status},{merge:true});
+    toast('Application '+status,'ok');
+    await loadAllApps();
+  } catch(e){ toast(e.message,'err'); }
+}
+
+/* ─── LOGOUT ─── */
+async function doLogout(){
+  const f=fb();
+  if(f) try { await f.signOut(f.auth); } catch(e){}
+  window._profile=null;
+  showPage('home');
+  toast('Logged out successfully');
+}
+
+/* ─── MODAL ─── */
+function openModal(){ document.getElementById('hostel-modal').classList.add('open'); }
+function closeModal(){ document.getElementById('hostel-modal').classList.remove('open'); }
+document.getElementById('hostel-modal').addEventListener('click',e=>{
+  if(e.target===document.getElementById('hostel-modal')) closeModal();
+});
+
+/* ─── show config warning if not set up ─── */
+window.addEventListener('load',()=>{
+  if(!window._fb || window._fb.auth?.app?.options?.apiKey==='YOUR_API_KEY'){
+    document.querySelectorAll('.cfg-warn').forEach(el=>el.style.display='block');
+  }
+});
+</script>
+
+<!--
+╔══════════════════════════════════════════════════════════╗
+║              FIREBASE SETUP — 5-MINUTE GUIDE             ║
+╠══════════════════════════════════════════════════════════╣
+║  1. Go to https://console.firebase.google.com            ║
+║  2. "Add project" → name it → Continue                   ║
+║  3. Left sidebar → Authentication → Get started          ║
+║     Enable: Email/Password provider                      ║
+║  4. Left sidebar → Firestore Database                    ║
+║     Create database → Start in TEST mode                 ║
+║  5. Left sidebar → Storage                               ║
+║     Get started → Start in TEST mode                     ║
+║  6. Gear ⚙ → Project settings → Your apps → </> Web     ║
+║     Register app → Copy firebaseConfig → paste above     ║
+║                                                          ║
+║  FIRESTORE COLLECTIONS:                                  ║
+║    students/{uid}           — student profiles           ║
+║    hostelApplications/{id}  — applications               ║
+║    staff/{uid}              — warden/admin profiles      ║
+║                                                          ║
+║  ADD WARDEN ACCOUNT:                                     ║
+║    1. Create user in Firebase Auth (email/pass)          ║
+║    2. Firestore → staff collection → New doc             ║
+║       Doc ID = user's UID                                ║
+║       Fields: { role: "warden", name: "Warden Name" }   ║
+╚══════════════════════════════════════════════════════════╝
+-->
+</body>
+</html>
